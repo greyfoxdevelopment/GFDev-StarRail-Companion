@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>StarRailCompanionSetup</AssemblyName>
+    <AssemblyTitle>Star Rail Companion Setup</AssemblyTitle>
+    <Product>Star Rail Companion</Product>
+    <RootNamespace>StarRailCompanionSetup</RootNamespace>
+    <Version>1.0.0</Version>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <ApplicationIcon>..\src\Resources\StarRail.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="..\LICENSE" LogicalName="StarRailCompanionSetup.LICENSE" />
+  </ItemGroup>
+
+</Project>

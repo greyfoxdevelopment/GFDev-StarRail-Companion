@@ -1,0 +1,147 @@
+STAR RAIL COMPANION - INSTRUCTIONS
+==================================
+
+INSTALL
+-------
+
+Download StarRailCompanionSetup.exe from the latest project release:
+  https://github.com/greyfoxdevelopment/GFDev-StarRail-Companion/releases/latest
+
+Run the installer, review and accept the included MIT License, choose an
+installation folder, and select Install. The installer downloads the latest
+StarRailCompanion.exe and its SHA-256 checksum from GitHub and verifies the
+download before installing it.
+
+The installer is a self-contained Windows x64 program. Embedded pages require
+the Microsoft Edge WebView2 Runtime, which is present on most Windows PCs.
+
+FIRST-TIME WARP SYNC
+--------------------
+
+1. Launch Honkai: Star Rail.
+2. Open Warp > View Details in-game and wait for the history page to load.
+3. Open Star Rail Companion and select Sync Warps.
+4. If the game cache is not found, use the folder button to select the game
+   installation folder containing StarRail_Data.
+
+Warp-history links expire. If sync reports an expired link, open Warp > View
+Details in-game again and retry. You can sync while the game is running. The
+app reads the local cache without modifying it or interacting with the game
+process.
+
+USING THE APP
+-------------
+
+Warps
+  View pity and 4-star/5-star counts for Character Event, Light Cone Event,
+  Stellar, and Departure Warps. Sync periodically because the game-history API
+  only returns a limited recent window; the app keeps successfully synced
+  history locally.
+
+Stellar Jade Planner
+  Enter Stellar Jades, Star Rail Special Passes, character-banner pity, and
+  featured guarantee state. The planner shows an estimated featured 5-star
+  chance and the worst-case number of Warps needed. The estimate is not a
+  guarantee of an in-game result. Pity and featured guarantee can be filled
+  from saved Character Event Warp history.
+
+Trailblaze & Daily
+  Select Sign in to HoYoLAB and sign in within the embedded page. Select Load
+  accounts, choose your Star Rail account, and select Refresh notes. The page
+  shows Trailblaze Power, Daily Training, weekly Simulated Universe score,
+  and expeditions.
+
+Builds
+  Enter the account's 9-digit UID and select Load Showcase to open its public
+  Honkai: Star Rail profile on Enka.Network. Only characters in the public
+  showcase are available; this does not show the account's full inventory.
+  If the embedded page cannot load, select Open showcase in browser.
+
+Interactive Map
+  Opens HoYoLAB's official Star Rail Interactive Map. Features depend on
+  HoYoLAB and its embedded sign-in session.
+
+Game News
+  Opens the official Honkai: Star Rail news page with Back, Refresh, and Open
+  in browser controls.
+
+What's New and Support
+  The dashboard lists current release notes. The Support tab contains the
+  project's support information and Ko-fi widget; the widget loads only when
+  that tab is opened.
+
+Window
+  Drag the title bar to move the window. Drag any border or corner to resize
+  it. Use the pin control to keep the app above other windows.
+
+DATA AND PRIVACY
+----------------
+
+Warp history, settings, and diagnostics are stored locally:
+  %LOCALAPPDATA%\HonkaiStarRailCompanion\warp_history.json
+  %LOCALAPPDATA%\HonkaiStarRailCompanion\settings.json
+  %LOCALAPPDATA%\HonkaiStarRailCompanion\sync_log.txt
+
+WebView2 stores the embedded browser profile under:
+  %LOCALAPPDATA%\HonkaiStarRailCompanion\WebView2
+
+The app reads the game's local web cache to find the Warp-history link. The
+link is held in memory while syncing and is not written to history, settings,
+or diagnostics. Treat it as private while it is valid. Deleting the
+HonkaiStarRailCompanion directory removes local app data.
+
+TROUBLESHOOTING
+---------------
+
+Game cache not found
+  Select the Star Rail game folder containing StarRail_Data with the folder
+  button. Open Warp > View Details in-game before trying again.
+
+No Warp link found
+  Make sure the Warp history page has fully loaded in-game, then sync again.
+  The sync diagnostics file records paths, counts, and API result codes, not
+  authorization links or keys.
+
+Warp link expired
+  Reopen Warp > View Details in-game and retry. The app can also offer a manual
+  PowerShell-assisted cache scan if automatic sync fails.
+
+HoYoLAB notes do not load
+  Confirm you signed in to the correct HoYoLAB account and selected a global
+  Star Rail account. Sign in again if HoYoLAB reports an expired session.
+
+Showcase is empty
+  Make sure the character showcase is populated and visible to other players.
+  Only public showcase characters are returned by Enka.Network.
+
+App update fails
+  Check your internet connection and retry. Updates require a matching
+  StarRailCompanion.exe and StarRailCompanion.exe.sha256 asset on the latest
+  GitHub Release.
+
+DEVELOPMENT AND RELEASES
+------------------------
+
+Requirements
+  Windows 10 or 11 x64 and the .NET 8 SDK.
+
+Run from source
+  Run Scripts\build.bat, or use:
+  dotnet run --project src\StarRailCompanion.csproj -c Release
+
+Build the installer
+  dotnet publish Setup\StarRailCompanionSetup.csproj -c Release -r win-x64 --self-contained true
+
+Publish a release
+  Set the Version in src\StarRailCompanion.csproj, then push a tag matching
+  that version (without a v prefix), for example:
+    git tag 1.0.1
+    git push origin 1.0.1
+  The release workflow builds the app and installer, computes the app
+  executable's SHA-256 checksum, and attaches all three assets to the GitHub
+  Release.
+
+The setup project downloads the latest release's app executable and checksum,
+verifies the checksum, and installs the app. The checksum detects corruption
+or mismatch; it is not an independent signature against compromise of the
+GitHub release account.

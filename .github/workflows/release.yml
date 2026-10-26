@@ -1,0 +1,58 @@
+name: Publish release
+
+on:
+  push:
+    tags:
+      - "*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Validate release version
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if ($env:RELEASE_TAG -notmatch '^\d+\.\d+\.\d+$') {
+            throw "Release tag must use Major.Minor.Patch without a v prefix."
+          }
+          [xml]$project = Get-Content src\StarRailCompanion.csproj
+          $projectVersion = $project.Project.PropertyGroup.Version
+          if ($projectVersion -ne $env:RELEASE_TAG) {
+            throw "Project version $projectVersion does not match release tag $env:RELEASE_TAG."
+          }
+
+      - name: Publish application
+        run: dotnet publish src\StarRailCompanion.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o publish\app
+
+      - name: Create application checksum
+        shell: pwsh
+        run: |
+          $appPath = "publish\app\StarRailCompanion.exe"
+          if (-not (Test-Path -LiteralPath $appPath)) {
+            throw "The published application executable was not found."
+          }
+          $hash = (Get-FileHash -LiteralPath $appPath -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  StarRailCompanion.exe" | Set-Content -LiteralPath "$appPath.sha256" -Encoding ascii
+
+      - name: Publish installer
+        run: dotnet publish Setup\StarRailCompanionSetup.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish\setup
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            publish/app/StarRailCompanion.exe
+            publish/app/StarRailCompanion.exe.sha256
+            publish/setup/StarRailCompanionSetup.exe
+          generate_release_notes: true
