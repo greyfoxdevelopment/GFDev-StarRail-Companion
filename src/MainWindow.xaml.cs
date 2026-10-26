@@ -1270,7 +1270,7 @@ public partial class MainWindow : Window
     // STEP 3 — Find a working Star Rail warp-history link in the local web cache.
     //   1. Game folder  : read from output_log.txt (works for HoYoPlay / custom installs)
     //   2. Cache file   : newest webCaches\<ver>\Cache\Cache_Data\data_2 (then the other data_* files)
-    //   3. Candidates   : split on "1/0/", keep chunks containing "webview_gacha",
+    //   3. Candidates   : split on "1/0/", keep chunks containing getGachaLog or getLdGachaLog,
     //                     take "https...game_biz=" from each, newest first
     //   4. Validate     : call the real API with every candidate until one returns retcode 0
     // The cache holds MANY old/expired links, so "take the last one" is not good enough.
@@ -1404,7 +1404,8 @@ public partial class MainWindow : Window
             for (int i = chunks.Length - 1; i >= 0 && result.Count < MaxLinkCandidates; i--)
             {
                 string chunk = chunks[i];
-                if (!chunk.Contains("webview_gacha", StringComparison.Ordinal)) continue;
+                if (!chunk.Contains("getGachaLog", StringComparison.OrdinalIgnoreCase) &&
+                    !chunk.Contains("getLdGachaLog", StringComparison.OrdinalIgnoreCase)) continue;
 
                 Match m = WarpLinkRegex.Match(chunk);
                 if (!m.Success || !m.Value.Contains('?')) continue;
@@ -1436,12 +1437,19 @@ public partial class MainWindow : Window
             try
             {
                 var versions = new DirectoryInfo(webCaches).GetDirectories()
-                    .OrderByDescending(d => d.LastWriteTimeUtc)
+                    .Select(d => new
+                    {
+                        Directory = d,
+                        Version = Version.TryParse(d.Name, out Version? parsed) ? parsed : null
+                    })
+                    .OrderByDescending(d => d.Version is not null)
+                    .ThenByDescending(d => d.Version)
+                    .ThenByDescending(d => d.Directory.LastWriteTimeUtc)
                     .Take(2);
 
-                foreach (DirectoryInfo version in versions)
+                foreach (var version in versions)
                 {
-                    string cacheData = Path.Combine(version.FullName, "Cache", "Cache_Data");
+                    string cacheData = Path.Combine(version.Directory.FullName, "Cache", "Cache_Data");
                     if (!Directory.Exists(cacheData)) continue;
 
                     var dataFiles = new DirectoryInfo(cacheData).GetFiles("data_*")

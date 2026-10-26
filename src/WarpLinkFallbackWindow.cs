@@ -30,7 +30,10 @@ internal sealed class WarpLinkFallbackWindow : Window
         if (-not $hit) { throw 'Cannot find the game folder in output_log.txt. Open Warp > View Details in-game first.' }
         $dataDir = $hit.Matches[0].Value -replace '/', '\'
 
-        $cacheVer = Get-ChildItem -LiteralPath (Join-Path $dataDir 'webCaches') -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+        $cacheVer = Get-ChildItem -LiteralPath (Join-Path $dataDir 'webCaches') -Directory |
+            Where-Object { $_.Name -match '^\d+\.\d+\.\d+\.\d+$' } |
+            Sort-Object { [version]$_.Name } -Descending |
+            Select-Object -First 1
         if (-not $cacheVer) { throw 'No webCaches folder found. Open Warp > View Details in-game first.' }
         $cacheFile = Join-Path $cacheVer.FullName 'Cache\Cache_Data\data_2'
         $tmpFile = Join-Path $env:TEMP 'starrail_cache_data_2'
@@ -55,7 +58,7 @@ internal sealed class WarpLinkFallbackWindow : Window
 
         $content = Get-Content -Encoding UTF8 -Raw -LiteralPath $tmpFile
         Remove-Item -LiteralPath $tmpFile -ErrorAction SilentlyContinue
-        $found = @(($content -split '1/0/') -match 'webview_gacha')
+        $found = @(($content -split '1/0/') -match 'getGachaLog|getLdGachaLog')
 
         $warpUrl = $null
         for ($i = $found.Length - 1; $i -ge 0; $i--) {
