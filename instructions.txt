@@ -108,7 +108,8 @@ Warp link expired
 
 HoYoLAB notes do not load
   Confirm you signed in to the correct HoYoLAB account and selected a global
-  Star Rail account. Sign in again if HoYoLAB reports an expired session.
+  Star Rail account. Sign in again if HoYoLAB reports an expired session. If
+  the request reports code -10001, update to the latest app version and retry.
 
 Showcase is empty
   Make sure the character showcase is populated and visible to other players.
@@ -137,8 +138,8 @@ Publish a release
   Set the Version in src\StarRailCompanion.csproj and
   Setup\StarRailCompanionSetup.csproj, then push a matching tag (without a v
   prefix), for example:
-    git tag 1.0.4
-    git push origin 1.0.4
+    git tag 1.0.5
+    git push origin 1.0.5
   The release workflow builds the app and installer, computes the app
   executable's SHA-256 checksum, and attaches all three assets to the GitHub
   Release.

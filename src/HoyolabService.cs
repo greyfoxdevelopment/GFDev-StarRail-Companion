@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Http;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -11,6 +13,8 @@ internal sealed class HoyolabService
         "https://api-account-os.hoyolab.com/binding/api/getUserGameRolesByLtoken?game_biz=hkrpg_global";
     private const string DailyNoteUrl =
         "https://bbs-api-os.hoyolab.com/game_record/app/hkrpg/api/note";
+    private const string DynamicSecretSalt = "okr4obncj8bw5a65hbnn5oo6ixjc3l9w";
+    private static readonly string DeviceId = Guid.NewGuid().ToString("D").ToUpperInvariant();
 
     private static readonly HttpClient Client = new(new HttpClientHandler
     {
@@ -48,11 +52,25 @@ internal sealed class HoyolabService
                      $"&server={Uri.EscapeDataString(role.Region)}";
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         AddHeaders(request, cookieHeader);
+        request.Headers.TryAddWithoutValidation("DS", CreateDynamicSecret(role));
+        request.Headers.TryAddWithoutValidation("x-rpc-device_id", DeviceId);
         using HttpResponseMessage response = await Client.SendAsync(request);
         string body = await response.Content.ReadAsStringAsync();
         HoyolabApiResponse<HoyolabDailyNote>? result = ParseResponse<HoyolabDailyNote>(response, body);
         return result?.Data
             ?? throw new HoyolabRequestException("HoYoLAB returned an empty real-time notes response.");
+    }
+
+    private static string CreateDynamicSecret(HoyolabRole role)
+    {
+        long timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        int random = RandomNumberGenerator.GetInt32(100_000, 200_001);
+        string query = $"role_id={Uri.EscapeDataString(role.GameUid)}" +
+                       $"&server={Uri.EscapeDataString(role.Region)}";
+        string source = $"salt={DynamicSecretSalt}&t={timestamp}&r={random}&b=&q={query}";
+        string signature = Convert.ToHexString(MD5.HashData(Encoding.UTF8.GetBytes(source)))
+            .ToLowerInvariant();
+        return $"{timestamp},{random},{signature}";
     }
 
     private static void AddHeaders(HttpRequestMessage request, string cookieHeader)
