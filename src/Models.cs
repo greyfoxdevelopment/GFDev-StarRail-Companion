@@ -45,10 +45,11 @@ public sealed class WarpStore
     public List<WarpItem> Items { get; set; } = new();
 }
 
-/// <summary>Contents of settings.json (only the optional custom game folder).</summary>
+/// <summary>Contents of settings.json.</summary>
 public sealed class AppSettings
 {
     public string? GameFolder { get; set; }
+    public long LastReleaseSequence { get; set; }
 }
 
 public sealed class ReleaseNote

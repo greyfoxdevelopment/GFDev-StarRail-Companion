@@ -41,6 +41,9 @@ public partial class MainWindow : Window
     private bool _hoyolabRequestRunning;
     private DateTimeOffset _lastHoyolabRequestUtc;
     private DateTimeOffset _lastHoyolabUpdateUtc;
+    private readonly DispatcherTimer _releaseRetryTimer = new() { Interval = TimeSpan.FromMinutes(5) };
+    private readonly HashSet<long> _handledReleaseSequences = new();
+    private ReleaseNotificationClient? _releaseNotificationClient;
     private HoyolabDailyNote? _dailyNote;
     private readonly DispatcherTimer _trailblazeCountdownTimer = new() { Interval = TimeSpan.FromSeconds(30) };
     private readonly HashSet<Version> _promptedUpdateVersions = new();
@@ -146,7 +149,8 @@ public partial class MainWindow : Window
         UpdatePlanner();
         BuildUidInput.Text = _store.LastUid ?? "";
         _trailblazeCountdownTimer.Tick += (_, _) => RenderDailyNote();
-        await CheckGitHubForUpdatesAsync();
+        _releaseRetryTimer.Tick += ReleaseRetryTimer_Tick;
+        await InitializeReleaseNotificationsAsync();
     }
 
     private async void HoyolabSignInButton_Click(object sender, RoutedEventArgs e)
@@ -1050,6 +1054,109 @@ public partial class MainWindow : Window
             string.Equals(Path.GetFileNameWithoutExtension(executablePath), applicationName, StringComparison.OrdinalIgnoreCase);
     }
 
+    private async Task InitializeReleaseNotificationsAsync()
+    {
+        if (CanSelfUpdate())
+        {
+            _releaseNotificationClient = new ReleaseNotificationClient(
+                _settings.LastReleaseSequence, HandleServerReleaseAsync);
+            _releaseNotificationClient.ErrorOccurred += ReleaseNotificationClient_ErrorOccurred;
+
+            bool serverAvailable = await _releaseNotificationClient.CheckLatestAndConnectAsync();
+            if (!serverAvailable)
+                SetStatus("Release service unavailable; checking GitHub for updates.");
+        }
+
+        await CheckGitHubForUpdatesAsync();
+        _releaseRetryTimer.Start();
+    }
+
+    private async void ReleaseRetryTimer_Tick(object? sender, EventArgs e)
+    {
+        if (_releaseNotificationClient == null) return;
+
+        await _releaseNotificationClient.ReconnectAndCatchUpAsync();
+    }
+
+    private void ReleaseNotificationClient_ErrorOccurred(Exception exception)
+    {
+        Dispatcher.BeginInvoke(() =>
+            SetStatus($"Release service check failed: {exception.Message}", isError: true));
+    }
+
+    private async Task HandleServerReleaseAsync(PublicRelease release)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            await Dispatcher.InvokeAsync(() => HandleServerReleaseAsync(release)).Task.Unwrap();
+            return;
+        }
+
+        ReleaseNotesList.ItemsSource =
+        new[]
+        {
+            new ReleaseNote
+            {
+                Title = $"{release.Version} — {release.Title}",
+                Details = string.IsNullOrWhiteSpace(release.Notes)
+                    ? "No release notes were provided."
+                    : release.Notes
+            }
+        };
+        ReleaseNotesSubtitle.Text = $"Latest release · published {release.PublishedAt.ToLocalTime():g}";
+
+        _settings.LastReleaseSequence = Math.Max(_settings.LastReleaseSequence, release.Sequence);
+        try
+        {
+            SaveJson(SettingsPath, _settings);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            SetStatus($"Could not save release-check progress: {ex.Message}", isError: true);
+        }
+
+        if (!_handledReleaseSequences.Add(release.Sequence)) return;
+
+        string? executablePath = Environment.ProcessPath;
+        if (executablePath == null) return;
+
+        Version currentVersion = Assembly.GetExecutingAssembly().GetName().Version
+            ?? throw new InvalidDataException("The application version is unavailable.");
+        if (!Version.TryParse(release.Version, out Version? releaseVersion) ||
+            NormalizeVersion(releaseVersion).CompareTo(NormalizeVersion(currentVersion)) <= 0)
+        {
+            return;
+        }
+
+        if (!_promptedUpdateVersions.Add(NormalizeVersion(releaseVersion))) return;
+
+        string notes = string.IsNullOrWhiteSpace(release.Notes) ? "(No release notes provided.)" : release.Notes;
+        MessageBoxResult result = MessageBox.Show(
+            this,
+            $"Version {release.Version} is available (you have {CurrentVersionText()}).\n\n{release.Title}\n\n{notes}\n\nDownload and install it now?",
+            "Star Rail Companion update",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Information);
+        if (result != MessageBoxResult.Yes) return;
+
+        try
+        {
+            AvailableUpdate? update = await UpdateService.GetAvailableUpdateAsync(currentVersion, releaseVersion);
+            if (update == null) return;
+
+            SetStatus($"Downloading and verifying version {update.Tag}…");
+            string downloadedPath = await UpdateService.DownloadAsync(update);
+            UpdateService.InstallWhenClosed(downloadedPath, Environment.ProcessId, executablePath);
+            Application.Current.Shutdown();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException
+                                   or InvalidDataException or IOException or UnauthorizedAccessException
+                                   or Win32Exception)
+        {
+            SetStatus($"Update check failed: {ex.Message}", isError: true);
+        }
+    }
+
     private async Task CheckGitHubForUpdatesAsync()
     {
         if (!CanSelfUpdate()) return;
@@ -1089,8 +1196,13 @@ public partial class MainWindow : Window
     private static Version NormalizeVersion(Version version) =>
         new(version.Major, version.Minor, Math.Max(version.Build, 0), Math.Max(version.Revision, 0));
 
-    private void MainWindow_Closed(object? sender, EventArgs e) =>
+    private async void MainWindow_Closed(object? sender, EventArgs e)
+    {
         _trailblazeCountdownTimer.Stop();
+        _releaseRetryTimer.Stop();
+        if (_releaseNotificationClient != null)
+            await _releaseNotificationClient.DisposeAsync();
+    }
 
     private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {

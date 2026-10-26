@@ -71,9 +71,9 @@ See [instructions.txt](instructions.txt) for feature details, troubleshooting, d
 
 ## Privacy
 
-Data is stored under `%LOCALAPPDATA%\HonkaiStarRailCompanion`. HoYoLAB cookies are kept in the local WebView2 profile and used only for requests you initiate. The app contacts HoYoverse/HoYoLAB for game features, Enka.Network for public profile lookups, GitHub for release checks/downloads, and Ko-fi when its support tab is opened. Each service may process request metadata under its own privacy policy.
+Data is stored under `%LOCALAPPDATA%\HonkaiStarRailCompanion`. HoYoLAB cookies are kept in the local WebView2 profile and used only for requests you initiate. The app contacts HoYoverse/HoYoLAB for game features, Enka.Network for public profile lookups, the Star Rail Companion release service for release metadata and live notifications, GitHub for update downloads and checksum verification, and Ko-fi when its support tab is opened. The last-seen release sequence is stored locally to catch up on published releases after a missed connection. Each service may process request metadata under its own privacy policy.
 
-The in-app updater checks the GitHub Releases page at startup. Updates are downloaded only after confirmation and SHA-256 verification. A checksum hosted beside the release detects corruption or mismatch but is not an independent signature against compromise of the release account.
+The app checks the release service at startup, listens for live release notifications, and retries periodically while running. Update metadata and release notes come from the release service; update executables and SHA-256 checksums are downloaded from GitHub only after confirmation. The checksum detects corruption or mismatch but is not an independent signature against compromise of the release account.
 
 ## License
 

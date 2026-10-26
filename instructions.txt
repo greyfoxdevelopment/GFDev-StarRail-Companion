@@ -115,9 +115,10 @@ Showcase is empty
   Only public showcase characters are returned by Enka.Network.
 
 App update fails
-  Check your internet connection and retry. Updates require a matching
-  StarRailCompanion.exe and StarRailCompanion.exe.sha256 asset on the latest
-  GitHub Release.
+  Check your internet connection and retry. The app checks the release service
+  for update metadata and listens for live release notifications. Confirmed
+  updates require a matching StarRailCompanion.exe and
+  StarRailCompanion.exe.sha256 asset on the corresponding GitHub Release.
 
 DEVELOPMENT AND RELEASES
 ------------------------
@@ -133,10 +134,11 @@ Build the installer
   dotnet publish Setup\StarRailCompanionSetup.csproj -c Release -r win-x64 --self-contained true
 
 Publish a release
-  Set the Version in src\StarRailCompanion.csproj, then push a tag matching
-  that version (without a v prefix), for example:
-    git tag 1.0.1
-    git push origin 1.0.1
+  Set the Version in src\StarRailCompanion.csproj and
+  Setup\StarRailCompanionSetup.csproj, then push a matching tag (without a v
+  prefix), for example:
+    git tag 1.0.2
+    git push origin 1.0.2
   The release workflow builds the app and installer, computes the app
   executable's SHA-256 checksum, and attaches all three assets to the GitHub
   Release.
