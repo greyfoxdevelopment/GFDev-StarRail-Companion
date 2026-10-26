@@ -9,7 +9,7 @@
     <AssemblyName>StarRailCompanion</AssemblyName>
     <AssemblyTitle>Star Rail Companion</AssemblyTitle>
     <RootNamespace>StarRailCompanion</RootNamespace>
-    <Version>1.0.2</Version>
+    <Version>1.0.3</Version>
     <Product>Star Rail Companion</Product>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <ApplicationIcon>Resources\StarRail.ico</ApplicationIcon>

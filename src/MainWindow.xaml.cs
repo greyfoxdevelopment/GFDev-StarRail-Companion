@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -1397,7 +1398,7 @@ public partial class MainWindow : Window
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private static readonly Regex WarpLinkRegex =
-        new(@"https://[^\x00-\x20""'<>]+?game_biz=[A-Za-z0-9_]+(?:&region=[A-Za-z0-9_]+)?",
+        new(@"https://[^\x00-\x20""'<>]+",
             RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private static readonly string[] DataFolderNames = { "StarRail_Data" };
@@ -1436,22 +1437,37 @@ public partial class MainWindow : Window
             }
 
             bool sawExpired = false;
+            bool sawApiResponse = false;
             int tested = 0;
             foreach (string candidate in candidates)
             {
                 tested++;
                 SetStatus($"Step 1/3 · Checking warp link {tested}/{candidates.Count}…");
 
-                int? retcode = await TestWarpLinkAsync(candidate);
-                Diag($"candidate {tested}: retcode {(retcode?.ToString() ?? "request failed")}");
+                CandidateTestResult test = await TestWarpLinkAsync(candidate);
+                Diag(test.Retcode is int retcode
+                    ? $"candidate {tested}: retcode {retcode}"
+                    : $"candidate {tested}: request failed ({test.Failure})");
 
-                if (retcode == 0) return NormalizeWarpApiUrl(candidate);
-                if (retcode is -100 or -101) sawExpired = true;
+                if (test.Retcode == 0) return NormalizeWarpApiUrl(candidate);
+                if (test.Retcode is int responseRetcode)
+                {
+                    sawApiResponse = true;
+                    if (responseRetcode is -100 or -101) sawExpired = true;
+                }
 
                 await Task.Delay(500);   // be gentle with the API while probing old links
             }
 
             if (sawExpired) throw new AuthKeyExpiredException();
+
+            if (!sawApiResponse)
+            {
+                throw new CacheNotFoundException(
+                    $"Found {candidates.Count} warp link(s), but the API requests could not be completed. " +
+                    "Check your internet connection or firewall, then retry. " +
+                    "(Details: %LocalAppData%\\HonkaiStarRailCompanion\\sync_log.txt)");
+            }
 
             throw new CacheNotFoundException(
                 $"Found {candidates.Count} link(s) in the cache but the API rejected all of them. " +
@@ -1463,8 +1479,10 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>Returns the API retcode for a candidate link, or null if the request itself failed.</summary>
-    private static async Task<int?> TestWarpLinkAsync(string candidate)
+    private sealed record CandidateTestResult(int? Retcode, string? Failure);
+
+    /// <summary>Tests one candidate and returns a safe failure category without logging its private URL.</summary>
+    private static async Task<CandidateTestResult> TestWarpLinkAsync(string candidate)
     {
         try
         {
@@ -1473,12 +1491,29 @@ public partial class MainWindow : Window
             string baseUrl = api[..api.IndexOf('?')];
             string url = BuildPageUrl(baseUrl, template, "11", 1, "0");
             WarpApiResponse resp = await GetPageAsync(url);
-            return resp.Retcode;
+            return new CandidateTestResult(resp.Retcode, null);
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException
-                                      or JsonException or ApiException or UriFormatException)
+        catch (HttpRequestException ex)
         {
-            return null;
+            return new CandidateTestResult(null, ex.StatusCode is HttpStatusCode statusCode
+                ? $"HTTP {(int)statusCode}"
+                : "network error");
+        }
+        catch (TaskCanceledException)
+        {
+            return new CandidateTestResult(null, "request timed out");
+        }
+        catch (JsonException)
+        {
+            return new CandidateTestResult(null, "invalid API response");
+        }
+        catch (ApiException)
+        {
+            return new CandidateTestResult(null, "empty API response");
+        }
+        catch (UriFormatException)
+        {
+            return new CandidateTestResult(null, "invalid cached URL");
         }
     }
 
@@ -1520,7 +1555,11 @@ public partial class MainWindow : Window
                     !chunk.Contains("getLdGachaLog", StringComparison.OrdinalIgnoreCase)) continue;
 
                 Match m = WarpLinkRegex.Match(chunk);
-                if (!m.Success || !m.Value.Contains('?')) continue;
+                if (!m.Success ||
+                    !HostRegex.IsMatch(m.Value) ||
+                    !m.Value.Contains("authkey=", StringComparison.OrdinalIgnoreCase) ||
+                    !m.Value.Contains("game_biz=", StringComparison.OrdinalIgnoreCase) ||
+                    !Uri.TryCreate(m.Value, UriKind.Absolute, out _)) continue;
 
                 if (seen.Add(m.Value)) result.Add(m.Value);
             }
@@ -1672,14 +1711,12 @@ public partial class MainWindow : Window
 
     private static string NormalizeWarpApiUrl(string url)
     {
-        var builder = new UriBuilder(url)
-        {
-            Host = url.Contains("mihoyo.com", StringComparison.OrdinalIgnoreCase)
-                ? "public-operation-hkrpg.mihoyo.com"
-                : "public-operation-hkrpg.hoyoverse.com",
-            Path = "/common/gacha_record/api/getGachaLog",
-            Fragment = ""
-        };
+        var builder = new UriBuilder(url);
+        builder.Host = builder.Host.EndsWith(".mihoyo.com", StringComparison.OrdinalIgnoreCase)
+            ? "public-operation-hkrpg.mihoyo.com"
+            : "public-operation-hkrpg.hoyoverse.com";
+        builder.Path = "/common/gacha_record/api/getGachaLog";
+        builder.Fragment = "";
 
         return builder.Uri.AbsoluteUri;
     }

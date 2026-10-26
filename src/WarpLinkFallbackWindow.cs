@@ -62,7 +62,7 @@ internal sealed class WarpLinkFallbackWindow : Window
 
         $warpUrl = $null
         for ($i = $found.Length - 1; $i -ge 0; $i--) {
-            $m = [regex]::Match($found[$i], 'https://[^\x00-\x20"''<>]+?game_biz=[A-Za-z0-9_]+(?:&region=[A-Za-z0-9_]+)?')
+            $m = [regex]::Match($found[$i], 'https://[^\x00-\x20"''<>]+')
             if (-not $m.Success) { continue }
             Write-Host "`rChecking link $($found.Length - $i)/$($found.Length)" -NoNewline
             try { if (Test-WarpUrl $m.Value) { $warpUrl = $m.Value; break } } catch { }
