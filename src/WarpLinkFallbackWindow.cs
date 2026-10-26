@@ -19,12 +19,11 @@ internal sealed class WarpLinkFallbackWindow : Window
         $ErrorActionPreference = 'Stop'
 
         $targets = @(
-            @{ Log = (Join-Path $env:USERPROFILE 'AppData\LocalLow\Cognosphere\Star Rail\output_log.txt'); ApiHost = 'public-operation-hkrpg.hoyoverse.com' },
-            @{ Log = (Join-Path $env:USERPROFILE 'AppData\LocalLow\miHoYo\Star Rail\output_log.txt'); ApiHost = 'public-operation-hkrpg.mihoyo.com' }
+            @{ Log = (Join-Path $env:USERPROFILE 'AppData\LocalLow\Cognosphere\Star Rail\output_log.txt') },
+            @{ Log = (Join-Path $env:USERPROFILE 'AppData\LocalLow\miHoYo\Star Rail\output_log.txt') }
         )
         $target = $targets | Where-Object { Test-Path -LiteralPath $_.Log } | Select-Object -First 1
         if (-not $target) { throw 'Cannot find output_log.txt. Launch Honkai: Star Rail and open Warp > View Details first.' }
-        $apiHost = $target.ApiHost
 
         $hit = Select-String -LiteralPath $target.Log -Pattern '[A-Za-z]:/(?:(?![A-Za-z]:/).)*?StarRail_Data' | Select-Object -First 1
         if (-not $hit) { throw 'Cannot find the game folder in output_log.txt. Open Warp > View Details in-game first.' }
@@ -42,11 +41,14 @@ internal sealed class WarpLinkFallbackWindow : Window
         function Test-WarpUrl($url) {
             $ProgressPreference = 'SilentlyContinue'
             $uri = [System.UriBuilder]::New($url)
-            $uri.Path = 'common/gacha_record/api/getGachaLog'
-            $uri.Host = $apiHost
             $uri.Fragment = ''
             $params = [System.Web.HttpUtility]::ParseQueryString($uri.Query)
-            $params.Set('lang', 'en')
+            foreach ($key in @($params.AllKeys)) {
+                if ($key -notin @('authkey', 'authkey_ver', 'sign_type', 'game_biz', 'lang')) {
+                    $params.Remove($key)
+                }
+            }
+            if (-not $params['lang']) { $params.Set('lang', 'en') }
             $params.Set('gacha_type', 11)
             $params.Set('page', '1')
             $params.Set('size', '5')

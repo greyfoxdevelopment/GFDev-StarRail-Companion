@@ -1711,12 +1711,19 @@ public partial class MainWindow : Window
 
     private static string NormalizeWarpApiUrl(string url)
     {
-        var builder = new UriBuilder(url);
-        builder.Host = builder.Host.EndsWith(".mihoyo.com", StringComparison.OrdinalIgnoreCase)
-            ? "public-operation-hkrpg.mihoyo.com"
-            : "public-operation-hkrpg.hoyoverse.com";
-        builder.Path = "/common/gacha_record/api/getGachaLog";
-        builder.Fragment = "";
+        var requiredParameters = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "authkey",
+            "authkey_ver",
+            "sign_type",
+            "game_biz",
+            "lang"
+        };
+        var builder = new UriBuilder(url) { Fragment = "" };
+        builder.Query = string.Join("&", ParseQuery(url)
+            .Where(parameter => requiredParameters.Contains(parameter.Key))
+            .Select(parameter =>
+                $"{Uri.EscapeDataString(parameter.Key)}={Uri.EscapeDataString(parameter.Value)}"));
 
         return builder.Uri.AbsoluteUri;
     }

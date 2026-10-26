@@ -137,8 +137,8 @@ Publish a release
   Set the Version in src\StarRailCompanion.csproj and
   Setup\StarRailCompanionSetup.csproj, then push a matching tag (without a v
   prefix), for example:
-    git tag 1.0.3
-    git push origin 1.0.3
+    git tag 1.0.4
+    git push origin 1.0.4
   The release workflow builds the app and installer, computes the app
   executable's SHA-256 checksum, and attaches all three assets to the GitHub
   Release.
